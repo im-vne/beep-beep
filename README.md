@@ -14,5 +14,5 @@ In order to clean this data, the following steps were taken:
 - All taxi rides that had negative values for any variable were removed.
 - All taxi rides that had a pickup or dropoff in a Taxi Zone that we didn't have demographic information (ie, that didn't have a corresponding Neighborhood Tabulation Area) were removed.
 - Only Taxi Rides with a "standard rate code" were kept in (as such, the RateCodeID variable was removed).
-- Only Taxi Rides that ended with Credit Card or Cash payment were kept.
+- Only Taxi Rides that ended with Credit Card payment were kept.
 - Only Taxi Rides that were not "store and foreward" were kept (such that the Store_and_fwd_flag variable was removed).
