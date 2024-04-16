@@ -5,8 +5,8 @@ taxis and stuff
 ## Explanation of Files
 
 - Above, we have a folder containing the Cleaned Data for each day of interest (in the folder named Cleaned), as well as the Cleaned Data merged with the Demographic Data- in addition to some other information (in the folder named Final).
-- The fullTrainData and fullTestData are constructed such that each of the 6 time chunks in each of our 12 days has 75 randomly chosen observations in the Train Data, and 25 randomly chosen observations in the Test Data. These are the files that are meant to be used in model construction and analysis. In this file, tipQuality is the response variable of interest, wherein a value of 1 corresponds to a tip 20% or greater, while a 0 corresponds to a tip less than 20%.
-- Additionally, the data dictionary serves to explain some of the terms seen in the _Final file, as some of the variables are encoded on an unitutitive, numeric scale that makes no sense when you look at it.
+- The fullTrainData and fullTestData are the actual files of interest that should be used. They are constructed such that each of the 6 time chunks in each of our 12 days has 75 randomly chosen observations in the Train Data, and 25 randomly chosen observations in the Test Data. These are the files that are meant to be used in model construction and analysis. In this file, tipQuality is the response variable of interest, wherein a value of 1 corresponds to a tip 20% or greater, while a 0 corresponds to a tip less than 20%.
+- Additionally, the data dictionary serves to explain some of the terms seen in the files of interest, as some of the variables are encoded on an unitutitive, numeric scale that makes no sense when you look at it.
 
 ## Data Cleaning
 
