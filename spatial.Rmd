@@ -1,0 +1,288 @@
+---
+title: "Spatial Portion"
+author: "Valerie Espinosa"
+date: "2024-04-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, warning = FALSE, message = FALSE}
+library(tidyverse)  # Modern data science workflow
+library(spdep)
+library(spatialreg)
+#library(rgdal)
+#library(rgeos)
+library(readr)
+library(sf)
+library(dplyr)
+library(ggplot2)
+install.packages("ngspatial")
+library(ngspatial)
+#install.packages("viridis")
+library(viridis)
+#install.packages("ggpattern")
+library(ggpattern)
+#install.packages("spmodel")
+library(spmodel)
+```
+
+```{r data, warning=FALSE, message=FALSE}
+#data import
+fullTestData =  read_csv("fullTestData.csv")
+fullTrainData = read_csv("fullTrainData.csv")
+
+#import shape file
+Sys.setenv(SHAPE_RESTORE_SHX="YES")
+
+#load information for each zone
+taxi_zone_lookup = read_csv("taxi_zone_lookup.csv")
+
+#import shape file for taxi zones 263 individual zones
+taxi_zones = st_read("taxi_zones.shp")
+#make it a sf file
+taxi_zones = st_as_sf(taxi_zones)
+
+#load information for each zone
+taxi_zone_lookup = read_csv("taxi_zone_lookup.csv")
+
+
+
+#get distances of taxi zone polygons
+distances = st_distance(taxi_zones,taxi_zones)
+  
+  
+colnames(distances) = taxi_zones$LocationID
+rownames(distances) = taxi_zones$LocationID
+
+#distance from zone 1, 263 values, inc. zeroes
+#distances["1",] 
+
+#change the location id as double to match
+taxi_zones$LocationID = as.double(rownames(taxi_zones))
+
+#join zone information and zone geometry
+spatial_data = left_join(taxi_zones, taxi_zone_lookup)
+
+#create dropoff zone and pickupzone column identical to locationID
+spatial_data$dropoffTaxiZone = spatial_data$LocationID
+
+spatial.train = left_join(spatial_data,fullTrainData)
+spatial.train$tipQuality = as.factor(spatial.train$tipQuality)
+
+spatial.test = left_join(spatial_data,fullTestData)
+spatial.test$tipQuality = as.factor(spatial.test$tipQuality)
+
+#take out EWR
+spatial.train = spatial.train[-1,]
+spatial.test = spatial.test[-1,]
+
+#replace 0 and 1's with good and bad
+spatial.train =  spatial.train %>% mutate(tipQuality = ifelse(tipQuality == 1,"Good","Bad"))
+
+spatial.test =  spatial.test %>% mutate(tipQuality = ifelse(tipQuality == 1,"Good","Bad"))
+
+```
+
+```{r}
+ggplot(data = spatial.train) +
+  geom_sf(aes(fill = tipQuality)) + 
+  scale_fill_brewer(palette = "Set4", na.value = "white") +
+  ggtitle("Training Taxi Tip Quality in NYC Taxi Zones") +
+  guides(fill = guide_legend(title = "Tip Quality"))
+
+
+ggplot(data = spatial.test) +
+  geom_sf(aes(fill = tipQuality)) + 
+  scale_fill_brewer(palette = "Set4", na.value = "white") +
+  ggtitle("Testing Taxi Tip Quality in NYC Taxi Zones") +
+  guides(fill = guide_legend(title = "Tip Quality"))
+
+ggplot(data = spatial.train) +
+  geom_sf(aes(fill = Borough)) + 
+  scale_fill_brewer(palette = "Set4", na.value = "white") +
+  ggtitle("Boroughs within the NYC Taxi Zones") +
+  guides(fill = guide_legend(title = "Tip Quality"))
+
+
+```
+
+
+##### Model Attemps
+
+
+```{r, warning=FALSE, message=FALSE}
+library(sf)
+library(tidyverse)
+library(tidycensus)
+library(corrr)
+library(tmap)
+library(spdep)
+library(tigris)
+library(rmapshaper)
+library(flextable)
+library(car)
+library(spatialreg)
+library(stargazer)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#data import
+fullTestData =  read_csv("fullTestData.csv")
+fullTrainData = read_csv("fullTrainData.csv")
+
+#import shape file
+Sys.setenv(SHAPE_RESTORE_SHX="YES")
+
+#load information for each zone
+taxi_zone_lookup = read_csv("taxi_zone_lookup.csv")
+
+
+taxi = st_read("taxi_zones.shp")
+#make it a sf file
+ 
+
+taxi$LocationID = as.double(rownames(taxi))
+
+#join zone information and zone geometry
+taxi_data = left_join(taxi, taxi_zone_lookup)
+
+#create dropoff zone and pickupzone column identical to locationID
+taxi_data$dropoffTaxiZone = taxi_data$LocationID
+
+taxi.train = left_join(taxi_data,fullTrainData)
+
+taxi.train$tipQuality = as.factor(taxi.train$tipQuality)
+
+taxi.test = left_join(taxi_data,fullTestData)
+taxi.test$tipQuality = as.factor(taxi.test$tipQuality)
+
+#take out EWR
+taxi.train = taxi.train[-1,]
+taxi.test = taxi.test[-1,]
+
+#remove Na's
+taxi.train = na.omit(taxi.train)
+taxi.test = na.omit(taxi.test)
+
+
+taxi.train %>%
+  st_drop_geometry() %>%
+  summary()
+
+```
+
+```{r}
+cor.table <- taxi.train %>%
+  dplyr::select(-tipQuality) %>%
+  st_drop_geometry() %>%
+  correlate()
+
+View(cor.table)
+```
+
+
+```{r}
+
+adj_shp = taxi.train %>% select(tipPercentage, geometry)
+
+
+#boundaries need to be more than one point
+nb <-poly2nb(adj_shp[2], queen = FALSE)
+
+#become weighted by rows
+Wproximity.list <- nb2listw(nb, style = "W",zero.policy = TRUE)
+
+W <- as(as_dgRMatrix_listw(Wproximity.list), "CsparseMatrix")
+
+plot(Wproximity.list,adj_shp$geometry)
+
+moran.plot(as.numeric(scale(taxi.train$tipPercentage)), listw=Wproximity.list, 
+           xlab="Standardized Tip Percentage", 
+           ylab="Neighbors Standardized Tip Percentage",
+           main=c("Moran Scatterplot for Tip Percentage", "in New York city") )
+
+#lots of 0's people are cheap as hell
+
+moran.test(adj_shp$tipPercentage,Wproximity.list, alternative= "two.sided", zero.policy = TRUE) 
+
+```
+
+```{r}
+lmod <- splm(tipPercentage ~ totalAmount + pickupTimeChunk + tripDistance + vendorID + extraFees, spcov_type = "none", data = taxi.train)
+summary(lmod)
+```
+
+
+```{r}
+class(taxi.train)
+
+spmod = splm(tipPercentage ~ totalAmount + pickupTimeChunk + tripDistance + vendorID + extraFees,spcov_type = "exponential", data = taxi.train)
+
+summary(spmod)
+```
+
+```{r}
+##diagnostics and mse
+
+AIC(spmod, lmod)
+AICc(spmod, lmod)
+
+loocv(spmod)
+loocv(lmod)
+
+```
+
+```{r}
+## predictions
+
+#save original test dataframe
+
+taxi.test.original = taxi.test 
+taxi.test = taxi.test %>% select(pickupTaxiZone, totalAmount, percentagePopulationAbove65_Pickup, pickupTimeChunk,passengerCount, tripDistance,vendorID,extraFees,tipPercentage)
+
+test.predictions = predict(spmod, newdata = taxi.test)
+
+test.predictions = ifelse(test.predictions < .20,0,1)
+
+table(test.predictions,taxi.test.original$tipQuality)
+
+
+```
+
+```{r}
+##results
+
+sensitivity = 318 / ( 318 +  262 )
+
+accuracy = (850 + 318 ) / (850 + 370 + 262 + 318)
+
+specificity = 850 / (850 + 370)
+
+neg.predicitive.value = 850 / (850 + 262)
+
+precision = 318 / (262 + 318)
+    
+```
+
+
+
+```{r}
+
+install.packages("pROC")
+library(ROCR)
+library(pROC)
+roc_object = roc(taxi.test.original$tipQuality,test.predictions)
+
+ggroc(roc_object)
+
+plot(roc_object,main = "ROC Curve for Spatial Model")
+
+auc(roc_object)
+
+
+
+```
